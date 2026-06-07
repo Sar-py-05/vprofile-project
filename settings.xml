@@ -6,7 +6,7 @@
     <server>
       <id>nexus</id>
       <username>admin</username>
-      <password>Admin@1234</password>
+      <password>admin123</password>
     </server>
   </servers>
 
