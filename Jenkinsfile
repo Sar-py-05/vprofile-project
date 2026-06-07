@@ -32,6 +32,12 @@ pipeline {
                     mvn clean install -s settings.xml -DskipTests
                     """
                 }
+                post {
+                    success {
+                        echo 'Now Archiving.'
+                        archiveArtifacts artifacts: '**/*.war'
+                    }.
+                }
             }
         }
     }
