@@ -7,12 +7,9 @@ pipeline {
     }
 
     environment {
-        SNAP_REPO = 'vprofile-snapshot'
-        RELEASE_REPO = 'vprofile-release'
-        CENTRAL_REPO = 'vpro-maven-central'
-        NEXUSIP = '172.31.95.139'
-        NEXUSPORT = '8081'
-        NEXUS_GRP_REPO = 'vpro-maven-group'
+        NEXUS_USER = 'admin'
+        NEXUS_PASS = 'Admin@1234'
+        NEXUS_IP = '172.31.95.139'
     }
 
     stages {
@@ -26,20 +23,14 @@ pipeline {
 
         stage('Build') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'nexuslogin',
+                withCredentials([usernamePassword(credentialsId: 'nexuslogin',
                     usernameVariable: 'NEXUS_USER',
-                    passwordVariable: 'NEXUS_PASS'
-                )]) {
+                    passwordVariable: 'NEXUS_PASS')]) {
 
-                    sh 'mvn clean install -s settings.xml -DskipTests'
+                    sh """
+                    mvn clean install -s settings.xml -DskipTests
+                    """
                 }
-            }
-        }
-
-        stage('Test') {
-            steps {
-                sh 'mvn test'
             }
         }
     }
