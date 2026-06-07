@@ -28,6 +28,7 @@ pipeline {
                     passwordVariable: 'NEXUS_PASS')]) {
 
                     sh """
+                    java -version
                     mvn clean install -s settings.xml -DskipTests
                     """
                 }
