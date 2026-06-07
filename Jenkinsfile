@@ -1,26 +1,45 @@
 pipeline {
     agent any
+
     tools {
         maven "MAVEN3.9.9"
         jdk "JDK17"
     }
-    
+
     environment {
         SNAP_REPO = 'vprofile-snapshot'
-		NEXUS_USER = 'admin'
-		NEXUS_PASS = 'admin1234'
-		RELEASE_REPO = 'vprofile-release'
-		CENTRAL_REPO = 'vpro-maven-central'
-		NEXUSIP = '172.31.95.139'
-		NEXUSPORT = '8081'
-		NEXUS_GRP_REPO = 'vpro-maven-group'
-        NEXUS_LOGIN = 'nexuslogin'
+        RELEASE_REPO = 'vprofile-release'
+        CENTRAL_REPO = 'vpro-maven-central'
+        NEXUSIP = '172.31.95.139'
+        NEXUSPORT = '8081'
+        NEXUS_GRP_REPO = 'vpro-maven-group'
     }
 
     stages {
-        stage('Build'){
+
+        stage('Checkout') {
             steps {
-                sh 'mvn -s settings.xml -DskipTests install'
+                git branch: 'jenkins-ci',
+                url: 'https://github.com/Sar-py-05/vprofile-project.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexuslogin',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh 'mvn clean install -s settings.xml -DskipTests'
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
             }
         }
     }
