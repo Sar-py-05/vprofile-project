@@ -1,33 +1,21 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<settings>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.1.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.1.0 http://maven.apache.org/xsd/settings-1.1.0.xsd">
 
   <servers>
     <server>
-      <id>vpro-maven-group</id>
-      <username>admin</username>
-      <password>Admin@1234</password>
-    </server>
-
-    <server>
-      <id>vprofile-snapshot</id>
-      <username>admin</username>
-      <password>Admin@1234</password>
-    </server>
-
-    <server>
-      <id>vprofile-release</id>
+      <id>nexus</id>
       <username>admin</username>
       <password>Admin@1234</password>
     </server>
   </servers>
 
   <mirrors>
-  <mirror>
-    <id>nexus</id>
-    <name>nexus-group</name>
-    <url>http://172.31.95.139:8081/repository/vpro-maven-group/</url>
-    <mirrorOf>*</mirrorOf>
-  </mirror>
-</mirrors>
+    <mirror>
+      <id>nexus</id>
+      <mirrorOf>*</mirrorOf>
+      <url>http://172.31.95.139:8081/repository/vpro-maven-group/</url>
+    </mirror>
+  </mirrors>
 
 </settings>
