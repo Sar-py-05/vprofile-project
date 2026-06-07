@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         NEXUS_USER = 'admin'
-        NEXUS_PASS = 'Admin@1234'
+        NEXUS_PASS = 'admin123'
         NEXUS_IP = '172.31.95.139'
     }
 
