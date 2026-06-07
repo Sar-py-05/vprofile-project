@@ -23,32 +23,35 @@ pipeline {
 
         stage('Build') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'nexuslogin',
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexuslogin',
                     usernameVariable: 'NEXUS_USER',
-                    passwordVariable: 'NEXUS_PASS')]) {
-
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
                     sh """
-                    java -version
-                    mvn clean install -s settings.xml -DskipTests
+                        java -version
+                        mvn clean install -s settings.xml -DskipTests
                     """
                 }
-                post {
-                    success {
-                        echo 'Now Archiving.'
-                        archiveArtifacts artifacts: '**/*.war'
-                    }
+            }
+            post {
+                success {
+                    echo 'Build successful - archiving WAR'
+                    archiveArtifacts artifacts: '**/*.war'
                 }
             }
-            stage(Test){
-                steps{
-                    sh "mvn -s settings.xml test"
-                }
-            }
-            stage("checkstyle Analysis"){
-                steps{
-                    sh "mvn -s settings.xml checkstyle:checkstyle"
-                }
+        }
 
+        stage('Test') {
+            steps {
+                sh "mvn -s settings.xml test"
+            }
+        }
+
+        stage('Checkstyle Analysis') {
+            steps {
+                sh "mvn -s settings.xml checkstyle:checkstyle"
+            }
         }
     }
 }
