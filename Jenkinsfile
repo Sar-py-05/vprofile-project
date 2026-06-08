@@ -7,11 +7,8 @@ pipeline {
     }
 
     environment {
-        NEXUS_USER = 'admin'
-        NEXUS_PASS = 'admin123'
         NEXUS_IP = '172.31.95.139'
-        SOARSERVER = 'sonarserver'
-        SONARSCANNER = 'sonarscanner'
+        SONAR_LOGIN = 'sonarlogin'
     }
 
     stages {
@@ -36,12 +33,6 @@ pipeline {
                     """
                 }
             }
-            post {
-                success {
-                    echo 'Build successful-archiving WAR'
-                    archiveArtifacts artifacts: '**/*.war'
-                }
-            }
         }
 
         stage('Test') {
@@ -50,57 +41,57 @@ pipeline {
             }
         }
 
-        stage('Checkstyle Analysis') {
+        stage('Checkstyle') {
             steps {
                 sh "mvn -s settings.xml checkstyle:checkstyle"
             }
         }
 
         stage('SonarQube Analysis') {
-            environment {
-                scannerHome = tool name: "${SONARSCANNER}"
-            }
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'sonarlogin',
-                    usernameVariable: 'SONAR_USER',
-                    passwordVariable: 'SONAR_PASS'
-                )]) {
-                    sh """
-                        ${scannerHome}/bin/sonar-scanner \
-                        -Dsonar.projectKey=vprofile \
-                        -Dsonar.projectName=vprofile \
-                        -Dsonar.projectVersion=1.0 \
-                        -Dsonar.sources=src/ \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.junit.reportPaths=target/surefire-reports/ \
-                        -Dsonar.jacoco.reportPaths=target/jacoco.exec \
-                        -Dsonar.checkstyle.reportPaths=target/checkstyle-result.xml \                        
-                    """
+                withSonarQubeEnv('sonarserver') {
+                    sh "mvn -s settings.xml sonar:sonar"
                 }
             }
         }
 
-         stage('Deploy to Nexus') {
+        stage('Archive WAR') {
+            steps {
+                archiveArtifacts artifacts: '**/*.war'
+            }
+        }
+
+        stage('Deploy to Nexus') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'nexuslogin',
                     usernameVariable: 'NEXUS_USER',
                     passwordVariable: 'NEXUS_PASS'
                 )]) {
+
                     sh """
                         mvn deploy:deploy-file \
                         -DgroupId=com.vprofile \
                         -DartifactId=vprofile-app \
                         -Dversion=1.0.0 \
                         -Dpackaging=war \
-                        -Dfile=target/vprofile-app.war \
+                        -Dfile=target/*.war \
                         -DrepositoryId=nexus-releases \
-                        -Durl=http://${NEXUS_IP}:8081/repository/maven-releases/ \
+                        -Durl=http://${NEXUS_IP}:8081/repository/vprofile-release/ \
                         -s settings.xml
                     """
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline SUCCESS 🎉"
+        }
+
+        failure {
+            echo "Pipeline FAILED ❌"
         }
     }
 }
