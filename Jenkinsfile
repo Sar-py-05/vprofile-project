@@ -36,7 +36,7 @@ pipeline {
             }
             post {
                 success {
-                    echo 'Build successful - archiving WAR'
+                    echo 'Build successful-archiving WAR'
                     archiveArtifacts artifacts: '**/*.war'
                 }
             }
