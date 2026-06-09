@@ -50,10 +50,20 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarserver') {
-                    sh "mvn -s settings.xml sonar:sonar"
+                    sh "mvn -s settings.xml clean verify sonar:sonar"
                 }
             }
         }
+
+        stage('SonarQube Analysis') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                withSonarQubeEnv('sonarserver') {
+                sh "mvn -s settings.xml clean verify sonar:sonar"
+                }
+        }
+    }
+}
 
         stage('Archive WAR') {
             steps {
