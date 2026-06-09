@@ -1,99 +1,67 @@
 pipeline {
     agent any
-
     tools {
-        maven "MAVEN3.9.9"
+         maven "MAVEN3.9"
         jdk "JDK17"
-    }
 
+    }
+    
     environment {
-        NEXUS_IP = '172.31.95.139'
+        SNAP_REPO = 'vprofile-snapshot'
+		NEXUS_USER = 'admin'
+		NEXUS_PASS = 'admin123'
+		RELEASE_REPO = 'vprofile-release'
+		CENTRAL_REPO = 'vpro-maven-central'
+		NEXUSIP = '172.31.5.4'
+		NEXUSPORT = '8081'
+		NEXUS_GRP_REPO = 'vpro-maven-group'
+        NEXUS_LOGIN = 'nexuslogin'
+        SONARSERVER = 'sonarserver'
+        SONARSCANNER = 'sonarscanner'
     }
 
     stages {
-
-        stage('Checkout') {
+        stage('Build'){
             steps {
-                git branch: 'jenkins-ci',
-                url: 'https://github.com/Sar-py-05/vprofile-project.git'
+                sh 'mvn -s settings.xml -DskipTests install'
             }
-        }
-
-        stage('Build') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'nexuslogin',
-                    usernameVariable: 'NEXUS_USER',
-                    passwordVariable: 'NEXUS_PASS'
-                )]) {
-
-                    sh """
-                        java -version
-                        mvn clean install -s settings.xml -DskipTests
-                    """
+            post {
+                success {
+                    echo "Now Archiving."
+                    archiveArtifacts artifacts: '**/*.war'
                 }
             }
         }
 
-        stage('Test') {
+        stage('Test'){
             steps {
-                sh "mvn -s settings.xml test"
+                sh 'mvn -s settings.xml test'
+            }
+
+        }
+
+        stage('Checkstyle Analysis'){
+            steps {
+                sh 'mvn -s settings.xml checkstyle:checkstyle'
             }
         }
 
-        stage('Checkstyle') {
-            steps {
-                sh "mvn -s settings.xml checkstyle:checkstyle"
+        stage('Sonar Analysis') {
+            environment {
+                scannerHome = tool "${SONARSCANNER}"
             }
-        }
-
-        stage('SonarQube Analysis') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    withSonarQubeEnv('sonarserver') {
-                        sh "mvn -s settings.xml clean verify sonar:sonar"
-                    }
-                }
+               withSonarQubeEnv("${SONARSERVER}") {
+                   sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=vprofile \
+                   -Dsonar.projectName=vprofile \
+                   -Dsonar.projectVersion=1.0 \
+                   -Dsonar.sources=src/ \
+                   -Dsonar.java.binaries=target/test-classes/com/visualpathit/account/controllerTest/ \
+                   -Dsonar.junit.reportsPath=target/surefire-reports/ \
+                   -Dsonar.jacoco.reportsPath=target/jacoco.exec \
+                   -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml'''
+              }
             }
-        }
-
-        stage('Archive WAR') {
-            steps {
-                archiveArtifacts artifacts: '**/*.war'
-            }
-        }
-
-        stage('Deploy to Nexus') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'nexuslogin',
-                    usernameVariable: 'NEXUS_USER',
-                    passwordVariable: 'NEXUS_PASS'
-                )]) {
-
-                    sh """
-                        mvn deploy:deploy-file \
-                        -DgroupId=com.vprofile \
-                        -DartifactId=vprofile-app \
-                        -Dversion=1.0.0 \
-                        -Dpackaging=war \
-                        -Dfile=target/*.war \
-                        -DrepositoryId=nexus-releases \
-                        -Durl=http://${NEXUS_IP}:8081/repository/vprofile-release/ \
-                        -s settings.xml
-                    """
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            echo "Pipeline SUCCESS 🎉"
-        }
-
-        failure {
-            echo "Pipeline FAILED ❌"
         }
     }
 }
