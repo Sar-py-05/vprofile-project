@@ -14,15 +14,11 @@ pipeline {
         NEXUS_REPO = 'vprofile-release'
         SNAP_REPO = 'vprofile-snapshot'
 
+        // Jenkins credentials
         NEXUS_LOGIN = 'nexuslogin'
 
-        // SonarQube (Jenkins config name)
+        // Sonar
         SONARSERVER = 'sonarserver'
-
-        // Jenkins Tool Name (MUST match UI exactly)
-        SONARSCANNER = 'SONARSCANNER'
-
-        // Project
         PROJECT_KEY = 'vprofile'
     }
 
@@ -35,14 +31,15 @@ pipeline {
             }
         }
 
-        stage('Build (Single Maven Build)') {
+        stage('Build + Test + Package') {
             steps {
-                sh "mvn clean install -DskipTests -s settings.xml"
+                sh """
+                    mvn clean package -DskipTests -s settings.xml
+                """
             }
 
             post {
                 success {
-                    echo "Build successful → Archiving WAR"
                     archiveArtifacts artifacts: 'target/*.war', fingerprint: true
                 }
             }
@@ -50,45 +47,35 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh "mvn test -DskipTests -s settings.xml"
+                sh "mvn test -s settings.xml -DskipTests"
             }
         }
 
         stage('Checkstyle') {
             steps {
-                sh "mvn checkstyle:checkstyle -DskipTests -s settings.xml"
+                sh "mvn checkstyle:checkstyle -s settings.xml"
             }
         }
 
-        stage('SonarQube Analysis (Optimized)') {
+        stage('SonarQube Analysis (LOW CPU MODE)') {
             steps {
-                script {
+                withSonarQubeEnv("${SONARSERVER}") {
 
-                    def scannerHome = tool name: "${SONARSCANNER}"
-
-                    withSonarQubeEnv("${SONARSERVER}") {
-
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=${PROJECT_KEY} \
-                            -Dsonar.projectName=${PROJECT_KEY} \
-                            -Dsonar.projectVersion=1.0 \
-                            -Dsonar.sources=src/main/java \
-                            -Dsonar.tests=src/test/java \
-                            -Dsonar.java.binaries=target/classes \
-                            -Dsonar.junit.reportPaths=target/surefire-reports \
-                            -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco.exec \
-                            -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/** \
-                            -Dsonar.sourceEncoding=UTF-8
-                        """
-                    }
+                    sh """
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=${PROJECT_KEY} \
+                        -Dsonar.projectName=${PROJECT_KEY} \
+                        -Dsonar.sourceEncoding=UTF-8 \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/** \
+                        -s settings.xml
+                    """
                 }
             }
         }
 
         stage('Deploy to Nexus') {
             steps {
-
                 withCredentials([usernamePassword(
                     credentialsId: "${NEXUS_LOGIN}",
                     usernameVariable: 'NEXUS_USER',
@@ -116,7 +103,6 @@ pipeline {
         success {
             echo "PIPELINE SUCCESS ✅"
         }
-
         failure {
             echo "PIPELINE FAILED ❌"
         }
