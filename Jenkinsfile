@@ -74,7 +74,7 @@ pipeline {
                         -DartifactId=vprofile \
                         -Dversion=1.0 \
                         -Dpackaging=war \
-                        -Dfile=target/*.war \
+                        -Dfile=target/vprofile-v2.war \
                         -DrepositoryId=vprofile-release \
                         -Durl=http://${NEXUS_IP}:8081/repository/vprofile-release/ \
                         -s settings.xml
