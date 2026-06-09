@@ -8,6 +8,7 @@ pipeline {
 
     environment {
         NEXUS_IP = '172.31.95.139'
+        MAVEN_OPTS = '-Xms256m -Xmx512m'
     }
 
     stages {
@@ -21,26 +22,35 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh "mvn clean package -DskipTests -s settings.xml"
+                sh "mvn clean package -DskipTests -T 1C -s settings.xml"
             }
         }
 
         stage('Test') {
             steps {
-                sh "mvn test -s settings.xml"
+                sh "mvn test -T 1C -s settings.xml"
             }
         }
 
         stage('Checkstyle') {
             steps {
-                sh "mvn checkstyle:checkstyle -s settings.xml"
+                sh "mvn checkstyle:checkstyle -T 1C -s settings.xml"
             }
         }
 
         stage('SonarQube') {
             steps {
                 withSonarQubeEnv('sonarserver') {
-                    sh "mvn sonar:sonar -s settings.xml"
+                    sh """
+                        mvn sonar:sonar -T 1C -s settings.xml \
+                        -Dsonar.projectKey=vprofile \
+                        -Dsonar.projectName=vprofile \
+                        -Dsonar.sources=src/main/java \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css \
+                        -Dsonar.javascript.enabled=false \
+                        -Dsonar.sourceEncoding=UTF-8
+                    """
                 }
             }
         }
@@ -51,7 +61,7 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to Nexus') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'nexuslogin',
