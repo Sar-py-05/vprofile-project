@@ -8,10 +8,7 @@ pipeline {
 
     environment {
         NEXUS_IP = '172.31.95.139'
-        NEXUS_USER = 'admin'
-        NEXUS_PASS = 'admin123'
-
-        SONAR_SERVER = 'sonarserver'
+        NEXUS_REPO = 'vprofile-release'
     }
 
     stages {
@@ -25,38 +22,41 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'mvn clean install -s settings.xml -DskipTests'
-            }
-            post {
-                success {
-                    archiveArtifacts artifacts: '**/*.war'
-                }
+                sh "mvn clean install -s settings.xml -DskipTests"
             }
         }
 
         stage('Test') {
             steps {
-                sh 'mvn test -s settings.xml'
+                sh "mvn test -s settings.xml"
             }
         }
 
         stage('Checkstyle') {
             steps {
-                sh 'mvn checkstyle:checkstyle -s settings.xml'
+                sh "mvn checkstyle:checkstyle -s settings.xml"
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv("${SONAR_SERVER}") {
+                withSonarQubeEnv('sonarserver') {
                     sh """
-                        mvn clean verify sonar:sonar \
+                        mvn sonar:sonar \
                         -Dsonar.projectKey=vprofile \
                         -Dsonar.projectName=vprofile \
-                        -Dsonar.host.url=\$SONAR_HOST_URL \
-                        -Dsonar.login=\$SONAR_AUTH_TOKEN
+                        -Dsonar.projectVersion=1.0 \
+                        -Dsonar.sources=src/main/java \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.exclusions=**/*.js,**/*.css,**/*.ts
                     """
                 }
+            }
+        }
+
+        stage('Archive WAR') {
+            steps {
+                archiveArtifacts artifacts: '**/*.war', fingerprint: true
             }
         }
 
@@ -70,9 +70,9 @@ pipeline {
 
                     sh """
                         mvn deploy:deploy-file \
-                        -DgroupId=com.vprofile \
-                        -DartifactId=vprofile-app \
-                        -Dversion=1.0.0 \
+                        -DgroupId=com.visualpathit \
+                        -DartifactId=vprofile \
+                        -Dversion=1.0 \
                         -Dpackaging=war \
                         -Dfile=target/*.war \
                         -DrepositoryId=vprofile-release \
@@ -86,7 +86,7 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline SUCCESS 🎉"
+            echo "Pipeline SUCCESS ✅"
         }
         failure {
             echo "Pipeline FAILED ❌"
