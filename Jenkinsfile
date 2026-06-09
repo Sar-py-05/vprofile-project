@@ -8,7 +8,6 @@ pipeline {
 
     environment {
         NEXUS_IP = '172.31.95.139'
-        SONAR_LOGIN = 'sonarlogin'
     }
 
     stages {
@@ -27,6 +26,7 @@ pipeline {
                     usernameVariable: 'NEXUS_USER',
                     passwordVariable: 'NEXUS_PASS'
                 )]) {
+
                     sh """
                         java -version
                         mvn clean install -s settings.xml -DskipTests
@@ -49,21 +49,13 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarserver') {
-                    sh "mvn -s settings.xml clean verify sonar:sonar"
+                timeout(time: 5, unit: 'MINUTES') {
+                    withSonarQubeEnv('sonarserver') {
+                        sh "mvn -s settings.xml clean verify sonar:sonar"
+                    }
                 }
             }
         }
-
-        stage('SonarQube Analysis') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                withSonarQubeEnv('sonarserver') {
-                sh "mvn -s settings.xml clean verify sonar:sonar"
-                }
-        }
-    }
-}
 
         stage('Archive WAR') {
             steps {
