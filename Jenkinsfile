@@ -88,9 +88,9 @@ pipeline {
                         -DartifactId=vprofile \
                         -Dversion=1.0 \
                         -Dpackaging=war \
-                        -Dfile=target/*.war \
-                        -DrepositoryId=${NEXUS_REPO} \
-                        -Durl=http://${NEXUSIP}:${NEXUSPORT}/repository/${NEXUS_REPO}/ \
+                        -Dfile=target/vprofile-v2.war \
+                        -DrepositoryId=vprofile-release \
+                        -Durl=http://172.31.95.139:8081/repository/vprofile-release/ \
                         -DgeneratePom=true \
                         -s settings.xml
                     """
