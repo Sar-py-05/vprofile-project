@@ -8,7 +8,6 @@ pipeline {
 
     environment {
         NEXUS_IP = '172.31.95.139'
-        NEXUS_REPO = 'vprofile-release'
     }
 
     stages {
@@ -22,7 +21,7 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh "mvn clean install -s settings.xml -DskipTests"
+                sh "mvn clean package -DskipTests -s settings.xml"
             }
         }
 
@@ -38,29 +37,21 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('SonarQube') {
             steps {
                 withSonarQubeEnv('sonarserver') {
-                    sh """
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=vprofile \
-                        -Dsonar.projectName=vprofile \
-                        -Dsonar.projectVersion=1.0 \
-                        -Dsonar.sources=src/main/java \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.exclusions=**/*.js,**/*.css,**/*.ts
-                    """
+                    sh "mvn sonar:sonar -s settings.xml"
                 }
             }
         }
 
         stage('Archive WAR') {
             steps {
-                archiveArtifacts artifacts: '**/*.war', fingerprint: true
+                archiveArtifacts artifacts: '**/*.war'
             }
         }
 
-        stage('Deploy to Nexus') {
+        stage('Deploy') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'nexuslogin',
@@ -70,11 +61,11 @@ pipeline {
 
                     sh """
                         mvn deploy:deploy-file \
+                        -Dfile=target/vprofile-v2.war \
                         -DgroupId=com.visualpathit \
                         -DartifactId=vprofile \
                         -Dversion=1.0 \
                         -Dpackaging=war \
-                        -Dfile=target/vprofile-v2.war \
                         -DrepositoryId=vprofile-release \
                         -Durl=http://${NEXUS_IP}:8081/repository/vprofile-release/ \
                         -s settings.xml
@@ -82,14 +73,14 @@ pipeline {
                 }
             }
         }
-    
+    }
 
     post {
         success {
-            echo "Pipeline SUCCESS ✅"
+            echo "SUCCESS"
         }
         failure {
-            echo "Pipeline FAILED ❌"
+            echo "FAILED"
         }
     }
 }
