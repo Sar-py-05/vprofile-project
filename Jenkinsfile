@@ -8,7 +8,8 @@ pipeline {
 
     environment {
         NEXUS_IP = '172.31.95.139'
-        MAVEN_OPTS = '-Xms256m -Xmx512m'
+        NEXUS_REPO = 'vprofile-release'
+        SONAR_SERVER = 'sonarserver'
     }
 
     stages {
@@ -22,42 +23,33 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh "mvn clean package -DskipTests -T 1C -s settings.xml"
+                sh "mvn clean package -DskipTests -s settings.xml"
             }
         }
 
         stage('Test') {
             steps {
-                sh "mvn test -T 1C -s settings.xml"
+                sh "mvn test -s settings.xml"
             }
         }
 
         stage('Checkstyle') {
             steps {
-                sh "mvn checkstyle:checkstyle -T 1C -s settings.xml"
+                sh "mvn checkstyle:checkstyle -s settings.xml"
             }
         }
 
-        stage('SonarQube') {
+        stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarserver') {
-                    sh """
-                        mvn sonar:sonar -T 1C -s settings.xml \
-                        -Dsonar.projectKey=vprofile \
-                        -Dsonar.projectName=vprofile \
-                        -Dsonar.sources=src/main/java \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css \
-                        -Dsonar.javascript.enabled=false \
-                        -Dsonar.sourceEncoding=UTF-8
-                    """
+                withSonarQubeEnv("${SONAR_SERVER}") {
+                    sh "mvn sonar:sonar -s settings.xml"
                 }
             }
         }
 
         stage('Archive WAR') {
             steps {
-                archiveArtifacts artifacts: '**/*.war'
+                archiveArtifacts artifacts: 'target/*.war', fingerprint: true
             }
         }
 
@@ -71,13 +63,14 @@ pipeline {
 
                     sh """
                         mvn deploy:deploy-file \
-                        -Dfile=target/vprofile-v2.war \
                         -DgroupId=com.visualpathit \
                         -DartifactId=vprofile \
                         -Dversion=1.0 \
                         -Dpackaging=war \
-                        -DrepositoryId=vprofile-release \
-                        -Durl=http://${NEXUS_IP}:8081/repository/vprofile-release/ \
+                        -Dfile=target/vprofile-v2.war \
+                        -DrepositoryId=${NEXUS_REPO} \
+                        -Durl=http://${NEXUS_IP}:8081/repository/${NEXUS_REPO}/ \
+                        -DgeneratePom=true \
                         -s settings.xml
                     """
                 }
@@ -87,10 +80,11 @@ pipeline {
 
     post {
         success {
-            echo "SUCCESS"
+            echo "PIPELINE SUCCESS ✅"
         }
+
         failure {
-            echo "FAILED"
+            echo "PIPELINE FAILED ❌"
         }
     }
 }
