@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -8,22 +7,11 @@ pipeline {
     }
 
     environment {
-
-        // Nexus Config
-        SNAP_REPO = 'vprofile-snapshot'
-        RELEASE_REPO = 'vprofile-release'
-        CENTRAL_REPO = 'vpro-maven-central'
-        NEXUSIP = '172.31.95.139'
-        NEXUSPORT = '8081'
-        NEXUS_GRP_REPO = 'vpro-maven-group'
-
+        NEXUS_IP = '172.31.95.139'
         NEXUS_USER = 'admin'
         NEXUS_PASS = 'admin123'
-        NEXUS_LOGIN = 'nexuslogin'
 
-        // Sonar Config
-        SONARSERVER = 'sonarserver'
-        SONARSCANNER = 'sonarscanner'
+        SONAR_SERVER = 'sonarserver'
     }
 
     stages {
@@ -37,12 +25,10 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh "mvn clean install -s settings.xml -DskipTests"
+                sh 'mvn clean install -s settings.xml -DskipTests'
             }
-
             post {
                 success {
-                    echo "Archiving WAR file..."
                     archiveArtifacts artifacts: '**/*.war'
                 }
             }
@@ -50,30 +36,48 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh "mvn -s settings.xml test"
+                sh 'mvn test -s settings.xml'
             }
         }
 
-        stage('Checkstyle Analysis') {
+        stage('Checkstyle') {
             steps {
-                sh "mvn -s settings.xml checkstyle:checkstyle"
+                sh 'mvn checkstyle:checkstyle -s settings.xml'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv("${SONARSERVER}") {
-
+                withSonarQubeEnv("${SONAR_SERVER}") {
                     sh """
-                        ${SONARSCANNER}/bin/sonar-scanner \
+                        mvn clean verify sonar:sonar \
                         -Dsonar.projectKey=vprofile \
                         -Dsonar.projectName=vprofile \
-                        -Dsonar.projectVersion=1.0 \
-                        -Dsonar.sources=src \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.junit.reportPaths=target/surefire-reports \
-                        -Dsonar.jacoco.reportPaths=target/jacoco.exec \
-                        -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml
+                        -Dsonar.host.url=\$SONAR_HOST_URL \
+                        -Dsonar.login=\$SONAR_AUTH_TOKEN
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Nexus') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexuslogin',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh """
+                        mvn deploy:deploy-file \
+                        -DgroupId=com.vprofile \
+                        -DartifactId=vprofile-app \
+                        -Dversion=1.0.0 \
+                        -Dpackaging=war \
+                        -Dfile=target/*.war \
+                        -DrepositoryId=vprofile-release \
+                        -Durl=http://${NEXUS_IP}:8081/repository/vprofile-release/ \
+                        -s settings.xml
                     """
                 }
             }
@@ -84,7 +88,6 @@ pipeline {
         success {
             echo "Pipeline SUCCESS 🎉"
         }
-
         failure {
             echo "Pipeline FAILED ❌"
         }
