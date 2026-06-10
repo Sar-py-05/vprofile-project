@@ -35,7 +35,7 @@ pipeline {
         stage('Build + Test + Package') {
             steps {
                 sh """
-                    mvn clean package -DskipTests -s settings.xml
+                    mvn clean package  -s settings.xml
                 """
             }
 
@@ -69,8 +69,8 @@ pipeline {
                         -Dsonar.sourceEncoding=UTF-8 \
                         -Dsonar.java.binaries=target/classes \
                         -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/** \
-                        -Dsonar.javascript.enabled=false
-                        -Dsonar.typescript.enabled=false
+                        -Dsonar.javascript.enabled=false \
+                        -Dsonar.typescript.enabled=false \
                         -s settings.xml
                     """
                 }
