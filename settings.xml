@@ -4,7 +4,7 @@
 
   <servers>
     <server>
-      <id>nexus</id>
+      <id>vprofile-release</id>
       <username>admin</username>
       <password>admin123</password>
     </server>
@@ -12,9 +12,9 @@
 
   <mirrors>
     <mirror>
-      <id>nexus</id>
+      <id>vprofile-release</id>
       <mirrorOf>*</mirrorOf>
-      <url>http://172.31.95.139:8081/repository/vpro-maven-group/</url>
+      <url>http://172.31.95.139:8081/repository/vprofile-release/</url>
     </mirror>
   </mirrors>
 
