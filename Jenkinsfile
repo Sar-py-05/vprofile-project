@@ -7,7 +7,8 @@ pipeline {
     }
 
     environment {
-
+        SONAR_SCANNER_OPTS = "-Xmx512m"
+        MAVEN_OPTS = "-Xmx1024m"
         // Nexus
         NEXUSIP = '172.31.95.139'
         NEXUSPORT = '8081'
@@ -47,7 +48,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh "mvn test -s settings.xml -DskipTests"
+                sh "mvn test -s settings.xml"
             }
         }
 
@@ -68,6 +69,8 @@ pipeline {
                         -Dsonar.sourceEncoding=UTF-8 \
                         -Dsonar.java.binaries=target/classes \
                         -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/** \
+                        -Dsonar.javascript.enabled=false
+                        -Dsonar.typescript.enabled=false
                         -s settings.xml
                     """
                 }
