@@ -1,3 +1,4 @@
+// This one was the last succesful pipeline run.
 pipeline {
     agent any
 
