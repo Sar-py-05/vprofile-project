@@ -7,23 +7,23 @@ pipeline {
     }
 
     environment {
-        SONAR_SCANNER_OPTS = "-Xmx512m"
         MAVEN_OPTS = "-Xmx1024m"
+        SONAR_SCANNER_OPTS = "-Xmx512m"
+
         // Nexus
-        NEXUSIP = '172.31.95.139'
-        NEXUSPORT = '8081'
-        NEXUS_REPO = 'vprofile-release'
-        SNAP_REPO = 'vprofile-snapshot'
+        NEXUSIP = "172.31.95.139"
+        NEXUSPORT = "8081"
 
-        // Jenkins credentials
-        NEXUS_LOGIN = 'nexuslogin'
+        // Jenkins Credentials
+        NEXUS_LOGIN = "nexuslogin"
 
-        // Sonar
-        SONARSERVER = 'sonarserver'
-        PROJECT_KEY = 'vprofile'
+        // SonarQube
+        SONARSERVER = "sonarserver"
+        PROJECT_KEY = "vprofile"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 git branch: 'jenkins-ci',
@@ -31,10 +31,11 @@ pipeline {
             }
         }
 
-        stage('Build + Test + Package') {
+        stage('Build') {
             steps {
-                sh "mvn clean package -s settings.xml"
+                sh 'mvn clean package -s settings.xml'
             }
+
             post {
                 success {
                     archiveArtifacts artifacts: 'target/*.war', fingerprint: true
@@ -42,32 +43,24 @@ pipeline {
             }
         }
 
-        stage('Test') {
-            steps {
-                sh "mvn test -s settings.xml"
-            }
-        }
-
         stage('Checkstyle') {
             steps {
-                sh "mvn checkstyle:checkstyle -s settings.xml"
+                sh 'mvn checkstyle:checkstyle -s settings.xml'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv("${SONARSERVER}") {
-                    sh """
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=${PROJECT_KEY} \
-                        -Dsonar.projectName=${PROJECT_KEY} \
-                        -Dsonar.sourceEncoding=UTF-8 \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/** \
-                        -Dsonar.javascript.enabled=false \
-                        -Dsonar.typescript.enabled=false \
-                        -s settings.xml
-                    """
+
+                    sh '''
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=vprofile \
+                    -Dsonar.projectName=vprofile \
+                    -Dsonar.java.binaries=target/classes \
+                    -Dsonar.sourceEncoding=UTF-8 \
+                    -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/**
+                    '''
                 }
             }
         }
@@ -82,25 +75,43 @@ pipeline {
 
         stage('Deploy to Nexus') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: "${NEXUS_LOGIN}",
-                    usernameVariable: 'NEXUS_USER',
-                    passwordVariable: 'NEXUS_PASS'
-                )]) {
-                    sh """
-                        mvn deploy:deploy-file \
-                        -DgroupId=com.visualpathit \
-                        -DartifactId=vprofile \
-                        -Dversion=1.0 \
-                        -Dpackaging=war \
-                        -Dfile=target/vprofile-v2.war \
-                        -DrepositoryId=vprofile-release \
-                        -Durl=http://${NEXUSIP}:${NEXUSPORT}/repository/vprofile-release/ \
-                        -DgeneratePom=true \
-                        -s settings.xml
-                    """
-                }
+
+                sh '''
+                WAR_FILE=$(find target -name "*.war" | head -1)
+
+                echo "Deploying $WAR_FILE"
+
+                mvn deploy:deploy-file \
+                -DgroupId=com.visualpathit \
+                -DartifactId=vprofile \
+                -Dversion=1.0 \
+                -Dpackaging=war \
+                -Dfile=$WAR_FILE \
+                -DrepositoryId=vprofile-release \
+                -Durl=http://172.31.95.139:8081/repository/vprofile-release/ \
+                -DgeneratePom=true \
+                -s settings.xml
+                '''
             }
+        }
+    }
+
+    post {
+
+        success {
+            echo 'PIPELINE SUCCESS ✅'
+        }
+
+        failure {
+            echo 'PIPELINE FAILED ❌'
+        }
+
+        always {
+
+            cleanWs(
+                deleteDirs: true,
+                disableDeferredWipeout: true
+            )
         }
     }
 }
