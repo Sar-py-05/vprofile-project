@@ -1,6 +1,4 @@
-//VERSION FORMAT- BUILD_NUMBER-TIMESTAMP-GIT_SHA in nexus repo.
-//Example:        41-20260611-120112-f405721
-
+//you'll get: something like - vprofile- 40-20260611-063820 in nexus repo.
 pipeline {
     agent any
 
@@ -100,26 +98,17 @@ pipeline {
 
                 script {
 
-                    def gitCommit = sh(
-                        script: "git rev-parse --short HEAD",
-                        returnStdout: true
-                    ).trim()
-
                     def artifactVersion =
-                        "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}-${gitCommit}"
-
-                    echo """
-=================================================
-Build Number : ${env.BUILD_NUMBER}
-Git Commit   : ${gitCommit}
-Version      : ${artifactVersion}
-=================================================
-"""
+                        "${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd-HHmmss')}"
 
                     sh """
                         WAR_FILE=\$(find target -name "*.war" | head -1)
 
-                        echo "Deploying WAR File: \$WAR_FILE"
+                        echo "====================================="
+                        echo "Artifact Deployment Starting"
+                        echo "WAR File : \$WAR_FILE"
+                        echo "Version  : ${artifactVersion}"
+                        echo "====================================="
 
                         mvn deploy:deploy-file \
                         -DgroupId=com.visualpathit \
@@ -128,7 +117,7 @@ Version      : ${artifactVersion}
                         -Dpackaging=war \
                         -Dfile=\$WAR_FILE \
                         -DrepositoryId=vprofile-release \
-                        -Durl=http://${NEXUSIP}:${NEXUSPORT}/repository/${NEXUS_REPO}/ \
+                        -Durl=http://${NEXUSIP}:${NEXUSPORT}/repository/vprofile-release/ \
                         -DgeneratePom=true \
                         -s settings.xml
                     """
