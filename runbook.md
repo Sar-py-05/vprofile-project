@@ -93,3 +93,106 @@ Check:
 * Code Smells
 * Coverage
 * Quality Gate
+
+# Maintenance Operations *****
+
+## Jenkins Cleanup
+
+### Workspace Cleanup
+
+List large workspaces
+
+du -sh /var/lib/jenkins/workspace/*
+
+Remove old workspaces
+
+sudo rm -rf /var/lib/jenkins/workspace/*
+
+---
+
+### Maven Cache Cleanup
+
+Check cache size
+
+du -sh /var/lib/jenkins/.m2
+
+Delete cache
+
+sudo rm -rf /var/lib/jenkins/.m2/repository/*
+
+---
+
+### Sonar Cache Cleanup
+
+Check size
+
+du -sh /var/lib/jenkins/.sonar
+
+Delete cache
+
+sudo rm -rf /var/lib/jenkins/.sonar/cache/*
+
+---
+
+### Build History Cleanup
+
+Manage Jenkins
+→ Build Discarders
+
+Recommended:
+
+Keep:
+
+* Last 20 builds
+
+Discard:
+
+* Older builds
+
+---
+
+## Disk Space Monitoring
+
+Check disk usage
+
+df -h
+
+Check large directories
+
+sudo du -xh /var/lib/jenkins | sort -h | tail -20
+
+---
+
+## Memory Monitoring
+
+free -h
+
+---
+
+## Jenkins Restart
+
+sudo systemctl restart jenkins
+
+Verify
+
+sudo systemctl status jenkins
+
+---
+
+## SonarQube Restart
+
+sudo systemctl restart sonar
+
+Verify
+
+sudo systemctl status sonar
+
+---
+
+## Nexus Restart
+
+sudo systemctl restart nexus
+
+Verify
+
+sudo systemctl status nexus

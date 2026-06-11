@@ -55,3 +55,109 @@ Benefits:
 * Create reusable templates.
 * Maintain runbooks for future projects.
 * Treat documentation as part of the project, not an afterthought.
+
+
+# Additional Lessons Learned
+
+## Infrastructure Lessons
+
+### Small EC2 Instances Create Hidden Problems
+
+t3.small was insufficient for:
+
+* Jenkins
+* Maven Build
+* SonarQube Analysis
+
+Upgrading instance size improved stability.
+
+---
+
+### SonarQube Is Resource Intensive
+
+Static analysis can consume:
+
+* CPU
+* Memory
+* Disk
+
+Plan infrastructure accordingly.
+
+---
+
+### Nexus Release Repositories Are Immutable
+
+Never deploy fixed versions repeatedly.
+
+Bad:
+
+1.0.1
+
+Good:
+
+41-20260611-120112-f405721
+
+---
+
+### Dynamic Versioning Is Essential
+
+Benefits:
+
+* Traceability
+* Rollback
+* Auditability
+* GitOps compatibility
+
+---
+
+### Documentation Saves Time
+
+Every failure should be documented with:
+
+* Error
+* Root Cause
+* Resolution
+* Prevention
+
+---
+
+### CI/CD Is Mostly Troubleshooting
+
+Most implementation time was spent on:
+
+* Jenkins configuration
+* SonarQube integration
+* Nexus authentication
+* Maven repository configuration
+* Resource constraints
+
+Not on writing pipeline code.
+
+---
+
+### Reusable Templates Accelerate Future Projects
+
+Reusable assets created:
+
+* Jenkins Pipeline Template
+* settings.xml Template
+* Nexus Deployment Template
+* SonarQube Integration Template
+
+These can be reused in:
+
+* Docker Projects
+* ECR Projects
+* Kubernetes Projects
+* Helm Projects
+* ArgoCD Projects
+
+---
+
+### Runbooks Are Production Assets
+
+A runbook is not documentation.
+
+A runbook is an operational recovery guide.
+
+If a server fails at 2 AM, the runbook should contain the exact commands needed to restore service.
