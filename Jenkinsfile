@@ -84,7 +84,7 @@ pipeline {
                 mvn deploy:deploy-file \
                 -DgroupId=com.visualpathit \
                 -DartifactId=vprofile \
-                -Dversion=1.0 \
+                -Dversion=1.0.1 \
                 -Dpackaging=war \
                 -Dfile=$WAR_FILE \
                 -DrepositoryId=vprofile-release \
