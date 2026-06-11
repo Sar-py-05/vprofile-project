@@ -1,0 +1,241 @@
+//This is the version I would preserve as a future reusable Jenkins CI/CD template. It supports:
+
+//Git Checkout
+//Dynamic Version Generation
+//Build Number
+//Timestamp
+//Git Commit ID
+//Maven Build
+//Unit Tests
+//Checkstyle
+//SonarQube Analysis
+//Sonar Quality Gate
+//Nexus Artifact Upload
+//Workspace Cleanup
+//Ready for future Docker/ECR/Helm/ArgoCD stages
+
+//The generated version will look like: 41-20260611-120112-f405721
+
+pipeline {
+    agent any
+
+    tools {
+        maven "MAVEN3.9.9"
+        jdk "JDK17"
+    }
+
+    environment {
+
+        // JVM Memory
+        SONAR_SCANNER_OPTS = "-Xmx512m"
+        MAVEN_OPTS         = "-Xmx1024m"
+
+        // Nexus
+        NEXUSIP      = '172.31.95.139'
+        NEXUSPORT    = '8081'
+        RELEASE_REPO = 'vprofile-release'
+        SNAP_REPO    = 'vprofile-snapshot'
+
+        // Credentials
+        NEXUS_LOGIN = 'nexuslogin'
+
+        // SonarQube
+        SONARSERVER = 'sonarserver'
+        PROJECT_KEY = 'vprofile'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'jenkins-ci',
+                    url: 'https://github.com/Sar-py-05/vprofile-project.git'
+            }
+        }
+
+        stage('Generate Version') {
+            steps {
+                script {
+
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+
+                    env.BUILD_TS = sh(
+                        script: "date +%Y%m%d-%H%M%S",
+                        returnStdout: true
+                    ).trim()
+
+                    env.ARTIFACT_VERSION =
+                        "${env.BUILD_NUMBER}-${env.BUILD_TS}-${env.GIT_COMMIT_SHORT}"
+
+                    echo "================================="
+                    echo "Artifact Version:"
+                    echo "${env.ARTIFACT_VERSION}"
+                    echo "================================="
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh '''
+                    mvn clean package -s settings.xml
+                '''
+            }
+
+            post {
+                success {
+                    archiveArtifacts(
+                        artifacts: 'target/*.war',
+                        fingerprint: true
+                    )
+                }
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                sh '''
+                    mvn test -s settings.xml
+                '''
+            }
+        }
+
+        stage('Code Quality - Checkstyle') {
+            steps {
+                sh '''
+                    mvn checkstyle:checkstyle -s settings.xml
+                '''
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+
+                withSonarQubeEnv("${SONARSERVER}") {
+
+                    sh '''
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=${PROJECT_KEY} \
+                        -Dsonar.projectName=${PROJECT_KEY} \
+                        -Dsonar.sourceEncoding=UTF-8 \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/** \
+                        -Dsonar.javascript.enabled=false \
+                        -Dsonar.typescript.enabled=false \
+                        -s settings.xml
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+
+                timeout(time: 10, unit: 'MINUTES') {
+
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Upload Artifact To Nexus') {
+            steps {
+
+                script {
+
+                    def warFile = sh(
+                        script: "find target -name '*.war' | head -1",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "WAR FILE: ${warFile}"
+                    echo "VERSION : ${env.ARTIFACT_VERSION}"
+
+                    sh """
+                        mvn deploy:deploy-file \
+                        -DgroupId=com.visualpathit \
+                        -DartifactId=vprofile \
+                        -Dversion=${env.ARTIFACT_VERSION} \
+                        -Dpackaging=war \
+                        -Dfile=${warFile} \
+                        -DrepositoryId=${RELEASE_REPO} \
+                        -Durl=http://${NEXUSIP}:${NEXUSPORT}/repository/${RELEASE_REPO}/ \
+                        -DgeneratePom=true \
+                        -s settings.xml
+                    """
+                }
+            }
+        }
+
+        /*
+        =====================================================
+        FUTURE STAGES
+        =====================================================
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build \
+                    -t vprofile:${ARTIFACT_VERSION} .
+                '''
+            }
+        }
+
+        stage('Push To ECR') {
+            steps {
+                sh '''
+                    docker push \
+                    <ecr-repo>:${ARTIFACT_VERSION}
+                '''
+            }
+        }
+
+        stage('Update Helm Values') {
+            steps {
+                sh '''
+                    yq -i '
+                    .app.tag = env(ARTIFACT_VERSION)
+                    ' helm/vprofile/values.yaml
+                '''
+            }
+        }
+
+        stage('GitOps Commit') {
+            steps {
+                sh '''
+                    git add .
+                    git commit -m "Deploy ${ARTIFACT_VERSION}"
+                    git push
+                '''
+            }
+        }
+        */
+    }
+
+    post {
+
+        always {
+
+            cleanWs()
+        }
+
+        success {
+
+            echo "================================="
+            echo "PIPELINE SUCCESS ✅"
+            echo "Artifact Version:"
+            echo "${env.ARTIFACT_VERSION}"
+            echo "================================="
+        }
+
+        failure {
+
+            echo "================================="
+            echo "PIPELINE FAILED ❌"
+            echo "================================="
+        }
+    }
+}
