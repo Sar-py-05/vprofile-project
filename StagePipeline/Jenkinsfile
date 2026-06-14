@@ -1,6 +1,8 @@
 //VERSION FORMAT- BUILD_NUMBER-TIMESTAMP-GIT_SHA in nexus repo.
 //Example:        41-20260611-120112-f405721
 
+def dockerimage
+
 pipeline {
     agent any
 
@@ -35,8 +37,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git branch: 'jenkins-ci',
-                    url: 'https://github.com/Sar-py-05/vprofile-project.git'
+                git branch: 'jenkins-ci', url: 'https://github.com/Sar-py-05/vprofile-project.git'
             }
         }
 
@@ -74,17 +75,16 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv("${SONARSERVER}") {
-
                     sh '''
                         mvn sonar:sonar \
-                        -Dsonar.projectKey=vprofile \
-                        -Dsonar.projectName=vprofile \
-                        -Dsonar.sourceEncoding=UTF-8 \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/** \
-                        -Dsonar.javascript.enabled=false \
-                        -Dsonar.typescript.enabled=false \
-                        -s settings.xml
+                            -Dsonar.projectKey=vprofile \
+                            -Dsonar.projectName=vprofile \
+                            -Dsonar.sourceEncoding=UTF-8 \
+                            -Dsonar.java.binaries=target/classes \
+                            -Dsonar.exclusions=**/*.js,**/*.ts,**/*.css,**/target/** \
+                            -Dsonar.javascript.enabled=false \
+                            -Dsonar.typescript.enabled=false \
+                            -s settings.xml
                     '''
                 }
             }
@@ -100,9 +100,7 @@ pipeline {
 
         stage('Deploy to Nexus') {
             steps {
-
                 script {
-
                     def gitCommit = sh(
                         script: "git rev-parse --short HEAD",
                         returnStdout: true
@@ -125,35 +123,39 @@ Version      : ${artifactVersion}
                         echo "Deploying WAR File: \$WAR_FILE"
 
                         mvn deploy:deploy-file \
-                        -DgroupId=com.visualpathit \
-                        -DartifactId=vprofile \
-                        -Dversion=${artifactVersion} \
-                        -Dpackaging=war \
-                        -Dfile=\$WAR_FILE \
-                        -DrepositoryId=vprofile-release \
-                        -Durl=http://${NEXUSIP}:${NEXUSPORT}/repository/${NEXUS_REPO}/ \
-                        -DgeneratePom=true \
-                        -s settings.xml
+                            -DgroupId=com.visualpathit \
+                            -DartifactId=vprofile \
+                            -Dversion=${artifactVersion} \
+                            -Dpackaging=war \
+                            -Dfile=\$WAR_FILE \
+                            -DrepositoryId=vprofile-release \
+                            -Durl=http://${NEXUSIP}:${NEXUSPORT}/repository/${NEXUS_REPO}/ \
+                            -DgeneratePom=true \
+                            -s settings.xml
                     """
                 }
             }
-            stage('Build App image') {
-                steps {
-                    script {}
-                        dockerimage = docker.build("${appRegistry}:${buildNumber}", "./Docker-files/app/multistage/")
-                    }
+        }
+
+        stage('Build App image') {
+            steps {
+                script {
+                    dockerimage = docker.build("${appRegistry}:${env.BUILD_NUMBER}", "./Docker-files/app/multistage/")
                 }
-                stage('Upload App image') {
-                    steps {
-                        script {
-                            docker.withRegistry("${vprofileRegistry}", "${regestrycredentials}") {
-                                dockerimage.push("${buildNumber}")
-                                dockerimage.push("latest")
-                            }
-                        }
-                    }
             }
         }
+
+        stage('Upload App image') {
+            steps {
+                script {
+                    docker.withRegistry("${vprofileRegistry}", "${regestrycredentials}") {
+                        dockerimage.push("${env.BUILD_NUMBER}")
+                        dockerimage.push("latest")
+                    }
+                }
+            }
+        }
+    }
 
     post {
 
