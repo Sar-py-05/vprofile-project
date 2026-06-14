@@ -26,6 +26,9 @@ pipeline {
         // SonarQube
         SONARSERVER = 'sonarserver'
         PROJECT_KEY = 'vprofile'
+        regestrycredentials = 'ecr:us-east-1:awscreds'
+        appRegistry = '896605683650.dkr.ecr.us-east-1.amazonaws.com/vprofileappimg'
+        vprofileRegistry = 'https://896605683650.dkr.ecr.us-east-1.amazonaws.com'
     }
 
     stages {
@@ -134,8 +137,23 @@ Version      : ${artifactVersion}
                     """
                 }
             }
+            stage('Build App image') {
+                steps {
+                    script {}
+                        dockerimage = docker.build("${appRegistry}:${buildNumber}", "./Docker-files/app/multistage/")
+                    }
+                }
+                stage('Upload App image') {
+                    steps {
+                        script {
+                            docker.withRegistry("${vprofileRegistry}", "${regestrycredentials}") {
+                                dockerimage.push("${buildNumber}")
+                                dockerimage.push("latest")
+                            }
+                        }
+                    }
+            }
         }
-    }
 
     post {
 
