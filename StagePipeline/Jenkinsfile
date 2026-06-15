@@ -141,7 +141,7 @@ Version      : ${artifactVersion}
             steps {
                 script {
                     dockerimage = docker.build("${appRegistry}:${env.BUILD_NUMBER}",
-                     "./Docker-files/app/multistage/")
+                     "./Docker-files/app")
                 }
             }
         }
