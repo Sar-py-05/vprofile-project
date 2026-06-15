@@ -12,13 +12,14 @@ pipeline {
     environment {
         cluster = "vproappProd"
         service = "vprofileapptask-service-prod"
-       
     }
 
-    stage('Deploy to Prod') {
+    stages {
+
+        stage('Deploy to Prod') {
             steps {
                 withAWS(region: 'us-east-1', credentials: 'awscreds') {
-                    sh """                                            
+                    sh """
                         aws ecs update-service \
                             --cluster ${cluster} \
                             --service ${service} \
@@ -27,6 +28,8 @@ pipeline {
                 }
             }
         }
+
+    }
 
     post {
 
