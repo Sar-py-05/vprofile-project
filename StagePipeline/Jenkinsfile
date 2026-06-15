@@ -28,7 +28,7 @@ pipeline {
         // SonarQube
         SONARSERVER = 'sonarserver'
         PROJECT_KEY = 'vprofile'
-        regestrycredentials = 'ecr:us-east-1:awscreds'
+        registryCredentials = 'ecr:us-east-1:awscreds'
         appRegistry = '896605683650.dkr.ecr.us-east-1.amazonaws.com/vprofileappimg'
         vprofileRegistry = 'https://896605683650.dkr.ecr.us-east-1.amazonaws.com'
     }
@@ -37,7 +37,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git branch: 'jenkins-ci', url: 'https://github.com/Sar-py-05/vprofile-project.git'
+                git branch: 'jenkins-cicd', url: 'https://github.com/Sar-py-05/vprofile-project.git'
             }
         }
 
@@ -140,7 +140,8 @@ Version      : ${artifactVersion}
         stage('Build App image') {
             steps {
                 script {
-                    dockerimage = docker.build("${appRegistry}:${env.BUILD_NUMBER}", "./Docker-files/app/multistage/")
+                    dockerimage = docker.build("${appRegistry}:${env.BUILD_NUMBER}",
+                     "./Docker-files/app/multistage/")
                 }
             }
         }
@@ -148,7 +149,7 @@ Version      : ${artifactVersion}
         stage('Upload App image') {
             steps {
                 script {
-                    docker.withRegistry("${vprofileRegistry}", "${regestrycredentials}") {
+                    docker.withRegistry("${vprofileRegistry}", "${registryCredentials}") {
                         dockerimage.push("${env.BUILD_NUMBER}")
                         dockerimage.push("latest")
                     }
