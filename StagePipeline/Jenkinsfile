@@ -162,11 +162,7 @@ Version      : ${artifactVersion}
         stage('Deploy to Staging') {
             steps {
                 withAWS(region: 'us-east-1', credentials: 'awscreds') {
-                    sh """
-                        aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment"""
-                }
-                script {
-                    sh """
+                    sh """                                            
                         aws ecs update-service \
                             --cluster ${cluster} \
                             --service ${service} \
