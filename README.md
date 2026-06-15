@@ -7,7 +7,7 @@
 ## Overview
 
 This project implements a Continuous Integration (CI) pipeline using:
-
+####
 * Jenkins
 * Maven
 * SonarQube
