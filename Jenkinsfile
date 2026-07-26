@@ -80,21 +80,17 @@ pipeline {
 
         stage("UploadArtifact"){
             steps{
-                nexusArtifactUploader(
-                  nexusVersion: 'nexus3',
-                  protocol: 'http',
-                  nexusUrl: "${NEXUSIP}:${NEXUSPORT}",
-                  groupId: 'QA',
-                  version: "${env.BUILD_ID}-${env.BUILD_TIMESTAMP}",
-                  repository: "${RELEASE_REPO}",
-                  credentialsId: "${NEXUS_LOGIN}",
-                  artifacts: [
-                    [artifactId: 'vproapp',
-                     classifier: '',
-                     file: 'target/vprofile-v2.war',
-                     type: 'war']
-                  ]
-                )
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexuslogin',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+                    sh '''
+                    curl -v -u ${NEXUS_USER}:${NEXUS_PASS} \
+                    --upload-file target/vprofile-v2.war \
+                    http://172.31.95.139:8081/repository/vprofile-release/QA/vproapp/${BUILD_ID}/vproapp-${BUILD_ID}.war
+                    '''
+                }
             }
         }
 
