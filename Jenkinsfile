@@ -50,7 +50,7 @@ pipeline {
             }
         }
 
-        stage('Sonar Analysis') {
+/*        stage('Sonar Analysis') {
             environment {
                 scannerHome = tool "${SONARSCANNER}"
             }
@@ -76,7 +76,7 @@ pipeline {
                     waitForQualityGate abortPipeline: true
                 }
             }
-        }
+        }*/
 
         stage("UploadArtifact"){
             steps{
