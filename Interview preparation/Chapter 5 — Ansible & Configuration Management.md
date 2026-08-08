@@ -1978,3 +1978,735 @@ sudo -u jenkins ansible --version
 sudo -u jenkins ansible-playbook \
   -i ansible/stage.inventory \
   ansible/site.yml
+
+# Chapter 5 — Ansible & Configuration Management
+## Part 4 — Q76–Q100: Advanced Ansible, Production Troubleshooting & FAANG-Level Scenarios
+
+Q76. How would you design an Ansible deployment so that it is safe to run repeatedly?
+
+Answer:
+I would make the playbooks idempotent. Every task should converge the system toward the desired state rather than blindly executing commands.
+
+For example, I would prefer modules such as `package`, `template`, `copy`, `service`, and `file` instead of unrestricted shell commands.
+
+I would also:
+- Use variables instead of hardcoded values.
+- Use handlers for service restarts.
+- Use `when` conditions where appropriate.
+- Separate configuration from application deployment.
+- Make deployment tasks safe to execute multiple times.
+- Validate configuration before restarting services.
+
+In this project, the Ansible deployment is responsible for configuring the application servers and deploying the WAR artifact. A production-quality implementation should therefore be designed so that running the same deployment twice produces the same desired state.
+
+
+Q77. What is the difference between Ansible idempotency and simply executing a command successfully?
+
+Answer:
+A successful command only tells me that the command completed successfully during that execution.
+
+Idempotency means that executing the same operation multiple times produces the same final state without causing unintended changes.
+
+For example:
+
+    shell: systemctl restart tomcat
+
+may succeed every time, but it is not inherently idempotent because every execution restarts Tomcat.
+
+A task such as:
+
+    service:
+      name: tomcat
+      state: started
+
+is closer to an idempotent operation because Ansible ensures the desired state rather than blindly restarting the service.
+
+In production automation, idempotency is important because pipelines may be retried after failures.
+
+
+Q78. Your Ansible deployment suddenly reports "No inventory was parsed." How would you troubleshoot it?
+
+Answer:
+I would troubleshoot it systematically.
+
+First, verify that the inventory file actually exists:
+
+    ls -l ansible/stage.inventory
+
+Then validate the inventory manually:
+
+    ansible-inventory -i ansible/stage.inventory --list
+
+or:
+
+    ansible-inventory -i ansible/stage.inventory --graph
+
+Then run:
+
+    ansible-playbook -i ansible/stage.inventory ansible/site.yml --list-hosts
+
+If Ansible cannot parse the inventory, I would inspect:
+- Inventory syntax.
+- Group names.
+- Host definitions.
+- File permissions.
+- File path.
+- Variable syntax.
+- Whether the inventory is INI, YAML, or another supported format.
+
+In this project, the Jenkins log showed:
+
+    Unable to parse .../ansible/stage.inventory
+    No inventory was parsed
+    Could not match supplied host pattern: appsrvgrp
+
+The important observation is that the problem occurred before the playbook could actually target the application servers.
+
+
+Q79. What does "Could not match supplied host pattern" mean in Ansible?
+
+Answer:
+It means the playbook references a host or group that Ansible cannot find in the parsed inventory.
+
+For example, if the playbook contains:
+
+    hosts: appsrvgrp
+
+then the inventory must contain a group called `appsrvgrp`.
+
+If the inventory is not parsed at all, Ansible also cannot resolve `appsrvgrp`.
+
+Therefore, when I see:
+
+    Could not match supplied host pattern, ignoring: appsrvgrp
+
+I would check both:
+1. Whether the inventory was successfully parsed.
+2. Whether `appsrvgrp` actually exists in that inventory.
+
+
+Q80. How would you troubleshoot an Ansible playbook that completes successfully but does not deploy anything?
+
+Answer:
+I would not immediately assume that the deployment succeeded.
+
+I would first inspect the output for:
+
+    skipping: no hosts matched
+
+Then I would validate the inventory:
+
+    ansible-inventory -i ansible/stage.inventory --graph
+
+Next I would verify the host group referenced by the playbook.
+
+For example:
+
+    - hosts: appsrvgrp
+
+requires `appsrvgrp` to exist in the inventory.
+
+I would then test connectivity:
+
+    ansible appsrvgrp -i ansible/stage.inventory -m ping
+
+If connectivity works, I would execute the playbook with verbosity:
+
+    ansible-playbook -i ansible/stage.inventory ansible/site.yml -vvv
+
+A pipeline should not consider "Ansible command exited successfully" equivalent to "application was successfully deployed." The play recap and actual target hosts must also be validated.
+
+
+Q81. What is the difference between `ansible-playbook` exit code 0 and successful application deployment?
+
+Answer:
+Exit code 0 indicates that Ansible itself completed without reporting a fatal execution error.
+
+It does not automatically prove that the intended application was deployed.
+
+For example, if all plays are skipped because no hosts match, the command can potentially complete successfully while performing zero deployment work.
+
+Therefore, I would verify:
+- Correct inventory.
+- Correct host group.
+- Number of hosts targeted.
+- Tasks changed.
+- Deployment artifact availability.
+- Application service status.
+- Application health endpoint.
+
+In the project logs, the Ansible stage ended with:
+
+    PLAY RECAP
+
+without any actual application server execution because the inventory could not be parsed.
+
+That is a classic example of why pipeline success must be validated beyond the process exit code.
+
+
+Q82. How would you design Ansible inventories for stage and production environments?
+
+Answer:
+I would keep environment-specific inventories separate while maintaining the same playbook structure.
+
+For example:
+
+    ansible/
+    ├── stage.inventory
+    ├── prod.inventory
+    ├── site.yml
+    └── roles/
+
+The stage inventory would contain staging hosts, while the production inventory would contain production hosts.
+
+The playbook can remain reusable:
+
+    ansible-playbook -i ansible/stage.inventory ansible/site.yml
+
+and:
+
+    ansible-playbook -i ansible/prod.inventory ansible/site.yml
+
+This separates environment targeting from deployment logic.
+
+For larger environments, I would eventually move toward inventory directories, group variables, host variables, and dynamic inventory.
+
+
+Q83. How would you prevent accidentally deploying a staging artifact to production?
+
+Answer:
+I would introduce explicit artifact versioning and environment controls.
+
+The production deployment should consume a known artifact version rather than simply using whatever happens to be present in a workspace.
+
+For example:
+
+    BUILD_ID=14
+
+could identify the artifact:
+
+    vproapp-14.war
+
+Production should then explicitly deploy that version.
+
+I would also introduce:
+- Manual approval before production deployment.
+- Separate production credentials.
+- Separate production inventory.
+- Immutable artifacts.
+- Artifact integrity validation.
+- Promotion from a tested artifact rather than rebuilding.
+
+The key principle is:
+
+    Build once -> test -> promote the same artifact
+
+rather than rebuilding separately for production.
+
+
+Q84. Why is "build once, deploy many" an important CI/CD principle?
+
+Answer:
+Because rebuilding the application for every environment can produce different artifacts.
+
+A better approach is:
+
+    Source
+      |
+      v
+    Build
+      |
+      v
+    Test
+      |
+      v
+    Artifact
+      |
+      +----> Stage
+      |
+      +----> Production
+
+The exact same artifact should move through environments.
+
+In this project, Jenkins creates a WAR artifact and uploads it to Nexus. Ansible can then retrieve and deploy that artifact.
+
+This creates a separation between:
+- Artifact creation.
+- Artifact storage.
+- Environment deployment.
+
+
+Q85. How would you securely handle Nexus credentials in Ansible?
+
+Answer:
+I would never hardcode credentials inside the playbook or inventory.
+
+Instead, I would use Jenkins credentials, Ansible Vault, a secrets manager, or another secure credential mechanism.
+
+For example, Jenkins can inject a credential into the pipeline and pass it to Ansible without exposing the value in logs.
+
+I would also avoid Groovy interpolation such as:
+
+    "${NEXUSPASS}"
+
+when passing secrets because Jenkins can warn that the secret is being passed through Groovy string interpolation.
+
+A better design is to use secure credential binding and environment variables or files in a way that prevents accidental secret exposure.
+
+
+Q86. Why did Jenkins report a warning about passing `NEXUSPASS` through Groovy string interpolation?
+
+Answer:
+The pipeline was constructing the Ansible invocation using a Groovy-interpolated secret.
+
+The Jenkins warning indicated:
+
+    A secret was passed to "ansiblePlaybook" using Groovy String interpolation.
+
+This is risky because interpolation can cause the secret to become part of the generated command or process arguments and potentially appear in logs or debugging output.
+
+The safer approach is to let Jenkins credential binding provide the secret at execution time and reference the environment variable inside the shell or supported Ansible mechanism without Groovy interpolation.
+
+
+Q87. How would you design Ansible roles for a production-grade application?
+
+Answer:
+I would break the deployment into reusable roles rather than putting everything into one large playbook.
+
+For example:
+
+    roles/
+    ├── common/
+    ├── java/
+    ├── tomcat/
+    ├── application/
+    └── monitoring/
+
+Each role would contain:
+
+    tasks/
+    handlers/
+    templates/
+    files/
+    defaults/
+    vars/
+    meta/
+
+The main playbook would orchestrate the roles.
+
+For example:
+
+    - hosts: appsrvgrp
+      roles:
+        - common
+        - java
+        - tomcat
+        - application
+
+This makes the automation easier to test, reuse, maintain, and troubleshoot.
+
+
+Q88. What is the difference between Ansible variables, facts, and registered variables?
+
+Answer:
+Variables are values explicitly supplied by the user, inventory, playbook, role, or another configuration source.
+
+Facts are information automatically gathered from managed hosts, such as:
+- Operating system.
+- IP addresses.
+- CPU information.
+- Memory.
+- Hostname.
+
+Registered variables contain the result of a specific task.
+
+For example:
+
+    - command: systemctl status tomcat
+      register: tomcat_status
+
+The result can then be used later:
+
+    when: tomcat_status.rc == 0
+
+Understanding these categories is important when creating conditional and environment-aware automation.
+
+
+Q89. When would you disable Ansible fact gathering?
+
+Answer:
+I would consider disabling fact gathering when:
+- Facts are not required.
+- The playbook runs against a very large number of hosts.
+- Startup performance is important.
+- The environment already provides the required host information elsewhere.
+
+For example:
+
+    - hosts: appsrvgrp
+      gather_facts: no
+
+However, I would not disable facts blindly. Many roles and tasks depend on facts such as operating system family, architecture, or IP information.
+
+I would measure the performance benefit before making this optimization in a production environment.
+
+
+Q90. How would you handle a Tomcat restart safely after deploying a new WAR?
+
+Answer:
+I would avoid blindly restarting Tomcat immediately.
+
+A safer sequence would be:
+
+    1. Validate the artifact.
+    2. Deploy the WAR.
+    3. Ensure the correct ownership and permissions.
+    4. Restart or reload Tomcat.
+    5. Wait for startup.
+    6. Check service status.
+    7. Perform a health check.
+    8. Fail the deployment if the application is unhealthy.
+
+Ansible handlers are useful here because they allow a service restart to occur only when the configuration or application artifact actually changes.
+
+For example:
+
+    notify:
+      - Restart Tomcat
+
+This avoids unnecessary restarts.
+
+
+Q91. How would you implement rollback using Ansible?
+
+Answer:
+I would keep previous application artifacts available and make the deployed version explicit.
+
+For example:
+
+    /opt/app/releases/
+        v10.war
+        v11.war
+        v12.war
+
+and maintain a predictable deployment target.
+
+If version 12 fails, Ansible can redeploy version 11.
+
+A production rollback process should also include:
+- Health verification.
+- Previous artifact retention.
+- Database compatibility considerations.
+- Service restart handling.
+- Clear rollback parameters.
+- Auditability.
+
+The rollback should not depend on rebuilding the application.
+
+
+Q92. What would you do if the application deployment succeeds but the application returns HTTP 500?
+
+Answer:
+I would separate deployment success from application health.
+
+First I would verify:
+
+    systemctl status tomcat
+
+Then inspect:
+- Tomcat logs.
+- Application logs.
+- JVM errors.
+- Database connectivity.
+- Configuration files.
+- Environment variables.
+- External dependencies.
+
+I would also test:
+
+    curl http://application-host:8080/
+
+or the application's health endpoint.
+
+If the previous version was healthy, I would compare the current and previous artifacts/configuration and consider rollback.
+
+Ansible can perform post-deployment health checks and fail the deployment if the application does not become healthy.
+
+
+Q93. How would you implement a post-deployment health check in Ansible?
+
+Answer:
+I could use Ansible's `uri` module.
+
+For example:
+
+    - name: Check application health
+      uri:
+        url: http://localhost:8080/
+        status_code: 200
+      register: health
+      retries: 10
+      delay: 10
+      until: health.status == 200
+
+This is better than assuming that a successful service restart means the application is ready.
+
+The deployment should verify the application's actual behavior before reporting success.
+
+
+Q94. How would you troubleshoot an Ansible deployment that works manually but fails from Jenkins?
+
+Answer:
+I would compare the execution environment.
+
+I would check:
+
+    1. Jenkins user.
+    2. SSH key.
+    3. SSH permissions.
+    4. Inventory path.
+    5. Working directory.
+    6. Ansible version.
+    7. Python version.
+    8. Environment variables.
+    9. File permissions.
+    10. Network connectivity.
+
+I would reproduce the exact Jenkins command manually as the Jenkins user.
+
+For example:
+
+    sudo -u jenkins ansible-playbook ...
+
+This is important because a command working under my personal account does not prove that it will work under the Jenkins service account.
+
+
+Q95. What is the significance of `--private-key` in the Jenkins Ansible command?
+
+Answer:
+It tells Ansible which SSH private key should be used to connect to the managed hosts.
+
+In the Jenkins log we saw:
+
+    --private-key /var/lib/jenkins/workspace/.../ssh....key
+
+This indicates that the Jenkins Ansible integration generated or provided a temporary private-key file for the deployment.
+
+The key must correspond to an authorized public key on the target EC2 instances.
+
+I would also verify:
+- File permissions.
+- Correct username.
+- Security group rules.
+- SSH port.
+- Target host address.
+
+
+Q96. How would you troubleshoot an Ansible SSH connection failure to an EC2 instance?
+
+Answer:
+I would start from the network layer and move upward.
+
+First:
+
+    ping <host>
+
+Then verify SSH port:
+
+    nc -zv <host> 22
+
+Then test SSH manually:
+
+    ssh -i key.pem ubuntu@<host>
+
+If that fails, I would check:
+- EC2 instance state.
+- Public/private IP.
+- Security group.
+- Network ACL.
+- Route table.
+- SSH key.
+- Username.
+- `sshd` status.
+- Host firewall.
+
+Then test Ansible:
+
+    ansible all -i inventory -m ping
+
+This isolates whether the problem is AWS networking, SSH, or Ansible configuration.
+
+
+Q97. How would you prevent configuration drift with Ansible?
+
+Answer:
+I would define the desired configuration as code and periodically apply or validate it.
+
+For example, Ansible can enforce:
+- Package versions.
+- Service state.
+- Configuration files.
+- Permissions.
+- Users.
+- Application configuration.
+
+I would store all automation in Git and use CI/CD to validate changes.
+
+For stronger drift detection, I could run scheduled Ansible checks or use configuration-management tooling that reports differences without applying them.
+
+The important principle is that the server should be treated as a reproducible desired state rather than manually maintained infrastructure.
+
+
+Q98. How would you integrate Ansible into the Jenkins CI/CD pipeline shown in this project?
+
+Answer:
+I would structure the pipeline approximately as:
+
+    Checkout
+       |
+       v
+    Build
+       |
+       v
+    Unit Tests
+       |
+       v
+    Checkstyle
+       |
+       v
+    Sonar Analysis
+       |
+       v
+    Quality Gate
+       |
+       v
+    Upload WAR to Nexus
+       |
+       v
+    Ansible Deployment
+       |
+       v
+    Health Check
+
+The Jenkins pipeline builds the application and stores the artifact in Nexus.
+
+Ansible then retrieves the specific artifact version and deploys it to the target environment.
+
+For production, I would add an approval gate between artifact validation and deployment.
+
+
+Q99. If you were asked to improve this project's Ansible deployment for a FAANG-level production environment, what would you change?
+
+Answer:
+I would improve it in several areas.
+
+1. Inventory:
+   Use structured inventories or dynamic inventory rather than fragile static host definitions.
+
+2. Roles:
+   Break the playbook into reusable roles.
+
+3. Secrets:
+   Move credentials into a secure secrets-management mechanism.
+
+4. Artifact management:
+   Deploy immutable, versioned artifacts from Nexus.
+
+5. Idempotency:
+   Ensure every task converges to the desired state.
+
+6. Validation:
+   Add pre-deployment and post-deployment validation.
+
+7. Health checks:
+   Verify the application after deployment.
+
+8. Rollback:
+   Keep previous versions and provide automated rollback.
+
+9. Observability:
+   Capture deployment logs and application health information.
+
+10. Production safety:
+    Add approval gates, restricted credentials, and environment-specific controls.
+
+11. Testing:
+    Validate Ansible syntax and roles before deployment.
+
+12. Auditability:
+    Record exactly which artifact version was deployed, by whom, and to which environment.
+
+The goal would be to make deployment reproducible, observable, secure, and reversible.
+
+
+Q100. Describe the complete CI/CD architecture of this project and explain where Ansible fits.
+
+Answer:
+The project follows a CI/CD flow where Jenkins acts as the orchestration engine.
+
+The high-level flow is:
+
+    Developer
+        |
+        v
+    GitHub
+        |
+        v
+    Jenkins
+        |
+        +--> Maven Build
+        |
+        +--> Unit Tests
+        |
+        +--> Checkstyle
+        |
+        +--> Sonar Analysis
+        |
+        +--> Quality Gate
+        |
+        v
+    WAR Artifact
+        |
+        v
+    Nexus Repository
+        |
+        v
+    Ansible
+        |
+        +--> Stage Inventory
+        |
+        +--> Production Inventory
+        |
+        v
+    Application Servers
+        |
+        v
+    Tomcat
+        |
+        v
+    VProfile Application
+
+Jenkins is responsible for orchestrating the pipeline.
+
+Maven builds and tests the application.
+
+Checkstyle performs static code-style analysis.
+
+Sonar provides code-quality analysis.
+
+Nexus provides centralized artifact storage.
+
+Ansible performs environment configuration and application deployment.
+
+The key architectural separation is:
+
+    Jenkins = orchestration
+    Maven = build/test
+    Sonar = code quality
+    Nexus = artifact repository
+    Ansible = configuration/deployment
+    Tomcat = application runtime
+
+A strong production implementation would further add immutable artifacts, environment approvals, automated health checks, rollback, secure secret management, observability, and deployment auditing.
+
+This separation of responsibilities is one of the most important architectural lessons from the project.
